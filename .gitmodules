@@ -1,6 +1,6 @@
 [submodule "prjxray-db"]
 	path = prjxray-db
 	url = git@github.com:lehaifeng000/prjxray-db.git
-[submodule "nextpnr-meta"]
-	path = nextpnr-meta
+[submodule "nextpnr-xilinx-meta"]
+	path = nextpnr-xilinx-meta
 	url = git@github.com:lehaifeng000/nextpnr-xilinx-meta.git
