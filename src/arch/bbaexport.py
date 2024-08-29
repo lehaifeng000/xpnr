@@ -4,6 +4,7 @@ import sys, argparse
 import bels, constid
 from nextpnr_structs import *
 import os
+import json
 
 def main():
 
@@ -61,6 +62,9 @@ def main():
 				nti.sites.append(nsi)
 			nti.tilewire_to_node = [-1] * tile_types[nti.tile_type].tile_wire_count
 			tile_insts.append(nti)
+	
+	with open("tile_insts.json",'w') as f:
+		json.dump(tile_insts,f)
 
 	# Begin writing bba
 	with open(args.bba, "w") as bbaf:

@@ -3,7 +3,7 @@
 import json
 from base.xpnr import Context, NetInfo, PortInfo, PortType, CellInfo
 
-def parse_json(filename, ctx: Context):
+def parse_json(ctx: Context, filename):
     with open(filename, 'r') as f:
         data:dict = json.load(f)
     data_modules = data['modules']
@@ -22,6 +22,13 @@ def parse_json(filename, ctx: Context):
     # import module
     top_module = data_modules[top_module_name]
     # attr
+
+    # settings
+    ctx.settings = top_module.get('settings',{})
+    from_yosys = True
+    if ctx.settings.get("synth", "0") != "0":
+        from_yosys = False
+        ctx.from_yosys = False
 
     # netnames
     netnames = top_module["netnames"]
@@ -44,20 +51,25 @@ def parse_json(filename, ctx: Context):
     for portname, portdata in top_module["ports"].items():
         bits = portdata["bits"]
         direction = portdata["direction"]
-        # 如果是vector，拆分成多个net存储
+        # 如果是vector，拆分成多个net存储，由于写json时top port要保持原组合，保留组合信息
         for index, bit in enumerate(bits):
             net = bit_maps[bit]
             new_port = PortInfo()
+            if from_yosys:
+                new_port.parent = new_port
+            new_port.is_top = True
             if len(bits)>1:
                 new_port.name = portname + "["+str(index)+"]"
             else:
                 new_port.name = portname
             if direction == "input":
                 new_port.type = PortType.PORT_IN
-                net.driver = new_port
+                if from_yosys:
+                    net.driver = new_port
             elif direction == "output":
                 new_port.type = PortType.PORT_OUT
-                net.users.append(new_port)
+                if from_yosys:
+                    net.users.append(new_port)
             ctx.ports[new_port.name] = new_port
     
     # cells
@@ -65,51 +77,83 @@ def parse_json(filename, ctx: Context):
         new_cell = CellInfo()
         new_cell.name = cellname
         new_cell.type = celldata["type"]
+
+        if cellname == "$PACKER_VCC_DRV" or cellname == "$PACKER_GND_DRV":
+            continue
+
         for k,v in celldata["attributes"].items():
-            new_cell.attrs[k] = property(v)
+            new_cell.attrs[k] = v
         for k,v in celldata["parameters"].items():
-            new_cell.params[k] = property(v)
+            new_cell.params[k] = v
         
         for portname, bits in celldata["connections"].items():
-            direction = celldata["port_directions"][portname]
+            if (not from_yosys) and new_cell.type == 'PAD': 
+                port_type = PortType.PORT_OUT if new_cell.attrs["X_IO_DIR"] == "IN" else PortType.PORT_IN
+            else:
+                direction = celldata["port_directions"][portname]
+            
             for bindex, bit in enumerate(bits):
                 if bit == "0":
-                    pass
-                    continue
+                    # 创建net
+                    net = NetInfo()
+                    net.name = cellname+"_"+portname+"_GND"
+                    net.bit = "0"
+                    net.constant = True
+                    ctx.nets[net.name] = net
                 elif bit == "1":
-                    pass
-                    continue
+                    # 创建net
+                    net = NetInfo()
+                    net.name = cellname+"_"+portname+"_VCC"
+                    net.bit = "1"
+                    net.constant = True
+                    ctx.nets[net.name] = net
                 elif bit == "x":
                     continue
-                net = bit_maps[bit]
+                else:
+                    net = bit_maps[bit]
+
+                if net.name == "$PACKER_GND_NET":
+                    if direction == "output":
+                        continue
+                    # 绑定到0
+                    net = NetInfo()
+                    net.name = cellname+"_"+portname+"_GND"
+                    net.bit = "0"
+                    net.constant = True
+                    ctx.nets[net.name] = net
+                elif net.name == "$PACKER_VCC_NET":
+                    if direction == "output":
+                        continue
+                    # 绑定到1
+                    net = NetInfo()
+                    net.name = cellname+"_"+portname+"_VCC"
+                    net.bit = "1"
+                    net.constant = True
+                    ctx.nets[net.name] = net
+
                 if len(bits) > 1:
                     new_port_name = portname+"["+str(bindex)+"]"
                 else:
                     new_port_name = portname
                 new_port = PortInfo()
                 new_port.name = new_port_name
-                if direction == "input":
-                    new_port.type = PortType.PORT_IN
-                    net.driver = new_port
-                elif direction == "output":
-                    new_port.type = PortType.PORT_OUT
-                    net.users.append(new_port)
-                new_cell.ports[new_port_name] = new_port
+                if (not from_yosys) and new_cell.type == 'PAD':
+                    new_port.type = port_type
+                    if port_type == PortType.PORT_IN:
+                        net.users.append(new_port)
+                    else:
+                        net.driver = new_port
+                else:
+                    if direction == "output":
+                        new_port.type = PortType.PORT_OUT    
+                        net.driver = new_port
+                    elif direction == "input":
+                        new_port.type = PortType.PORT_IN
+                        net.users.append(new_port)
+                    
+                new_cell.add_port(new_port)
 
         ctx.cells[cellname] = new_cell
     
     pass
         
-
-                
-
-
-
-            
-
-
-            
-        
-
-    
-    

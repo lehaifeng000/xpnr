@@ -2,6 +2,7 @@
 
 from enum import Enum
 
+
 class Context:
     _instance = None
     def __new__(cls, *args, **kwargs):
@@ -14,14 +15,28 @@ class Context:
             self.nets = {}
             self.cells = {}
             self.ports = {}
+            self.settings = {}
+            self.attrs = {}
             self.top_module_name = top_module_name
             self.initialized = True
+            self.from_yosys = True
     def set_args(self,args):
         self.args = args
     def set_top_module(self,top_module_name):
         self.top_module_name = top_module_name
     def get_top_module(self):
         return self.top_module_name
+    def write_json(self, filename):
+        jsondata = {}
+        jsondata["creator"] = "xilinx place and route by xpnr"
+        topdata = {}
+        topdata["settings"] = {}
+        for k, v in self.settings.items():
+            topdata["settings"][k] = v
+        topdata["attributes"] = {}
+        for k,v in self.attrs.items():
+            topdata["attributes"][k] = v
+        
 
 
 class NetInfo:
@@ -33,6 +48,7 @@ class NetInfo:
         self.wires = None
         self.users = []
         self.bit = None
+        self.constant = False
 
 class PortType(Enum):
     PORT_IN = 0
@@ -44,6 +60,8 @@ class PortInfo:
         pass
         self.name = None
         self.type = None
+        self.parent = None
+        self.is_top = False
 
 class CellInfo:
     def __init__(self) -> None:
@@ -54,6 +72,10 @@ class CellInfo:
         self.attrs = {}
         self.params = {}
         self.pins = {} # cell_port -> bel_pin
+    def add_port(self, port):
+        port.parent = self
+        self.ports[port.name] = port
+
 
 class Property:
     def is_number(self,s):
@@ -71,6 +93,9 @@ class Property:
             if self.is_num:
                 self.num = int(str, 2)
         pass
+
+    def to_json(self):
+        return self.str
 
 if __name__ == "__main__":
     ctx1 = Context(top_module="top1")

@@ -5,13 +5,39 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "arch",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/arch/bbaexport.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--xray","prjxray-db/artix7",
+                "--device","xc7a35tfgg484-2",
+                "--bba","xc7a35tfgg484-2.bba",
+                "--constids", "src/arch/constids.inc",
+                "--metadata", "nextpnr-xilinx-meta/artix7"
+            ]   
+        },
+        {
             "name": "main",
             "type": "debugpy",
             "request": "launch",
             "program": "src/main.py",
             "console": "integratedTerminal",
             "args": [
-                "--json","tmp/synth1.json"
+                "--json",
+                "tmp/blink_pack.json"
+            ]
+        },
+        {
+            "name": "json2dot",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/scripts/json2dot.py",
+            "console": "integratedTerminal",
+            "args": [
+                "tmp/synth.json",
+                "t.dot"
             ]
         }
     ]
